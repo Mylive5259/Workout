@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout Planner</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Segoe UI;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:20px}
+.container{max-width:1200px;margin:auto;color:#222}
+.header{text-align:center;color:#fff;margin-bottom:25px}
+.header h1{font-size:2.2em}
+
+.main{display:grid;grid-template-columns:1fr 2fr;gap:20px}
+
+.panel{background:#fff;border-radius:14px;padding:18px;box-shadow:0 10px 35px rgba(0,0,0,.25)}
+
+.day{padding:10px;border-radius:10px;background:#f2f2f2;margin-bottom:8px;cursor:pointer;border-left:4px solid #ccc}
+.day.active{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-left-color:#764ba2}
+
+.groupTitle{margin-top:12px;font-weight:700;color:#333}
+.muscleTitle{margin:8px 0 4px;color:#667eea;font-weight:600}
+
+.exerciseRow{display:flex;gap:6px;margin-bottom:6px}
+.exerciseBtn{flex:1;padding:10px;border-radius:8px;border:2px solid #ddd;background:#f4f4f4;cursor:pointer;text-align:left}
+.exerciseBtn.selected{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.viewBtn{background:#ff5252;color:white;border:none;border-radius:8px;padding:0 14px;cursor:pointer}
+
+.badge{background:#667eea;color:white;padding:6px 10px;border-radius:20px;margin:3px;display:inline-block;cursor:pointer}
+
+.card{background:#f7f7f7;border-radius:12px;padding:12px;margin-top:12px;border:2px solid #e0e0e0}
+.cardHeader{display:flex;justify-content:space-between;margin-bottom:8px}
+
+.btn{border:none;border-radius:8px;padding:5px 9px;color:white;cursor:pointer}
+.edit{background:#4CAF50}
+.del{background:#f44336}
+
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.65);align-items:center;justify-content:center;z-index:999}
+.modal.active{display:flex}
+.modalBox{background:white;border-radius:14px;padding:20px;width:90%;max-width:720px;position:relative}
+.close{position:absolute;top:10px;right:15px;font-size:26px;cursor:pointer}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+<div class="header">
+<h1>🏋️‍♂️ โปรแกรมจัดตารางเวท</h1>
+<p>เลือกวัน → เลือกท่า → ตารางจะจำให้เอง</p>
+</div>
+
+<div class="main">
+
+<div class="panel">
+<h3>📅 วัน</h3>
+<div id="dayList"></div>
+</div>
+
+<div class="panel">
+<h3>💪 ท่าฝึก</h3>
+<div id="exerciseList">← เลือกวันก่อน</div>
+</div>
+
+</div>
+
+<div class="panel" style="margin-top:20px">
+<h3>📊 ตารางสัปดาห์</h3>
+<div id="schedule"></div>
+</div>
+
+</div>
+
+<!-- modal -->
+
+<div class="modal" id="modal">
+<div class="modalBox">
+<span class="close" onclick="closeDetail()">×</span>
+<h2 id="mTitle"></h2>
+
+<div style="text-align:center;margin:10px 0">
+<img id="mImg" style="max-width:100%;border-radius:12px">
+<br><br>
+<button id="playBtn" style="padding:10px 16px;background:#ff5252;color:#fff;border:none;border-radius:10px">▶ ดูวิดีโอ</button>
+</div>
+
+<div id="videoBox" style="display:none;position:relative;width:100%;padding-bottom:56.25%">
+<iframe id="frame" style="position:absolute;width:100%;height:100%;border:none;border-radius:12px" allowfullscreen></iframe>
+</div>
+
+<p id="mDesc"></p>
+<p id="mTarget" style="color:#2e7d32;font-weight:600"></p>
+
+</div>
+</div>
+
+<script>
+
+/* ----------- DAYS ----------- */
+
+const weekDays=[
+{day:'จันทร์',muscles:[]},
+{day:'อังคาร',muscles:[]},
+{day:'พุธ',muscles:[]},
+{day:'พฤหัสบดี',muscles:[]},
+{day:'ศุกร์',muscles:[]},
+{day:'เสาร์',muscles:[]},
+{day:'อาทิตย์',muscles:[]}
+];
+
+/* ----------- LOCAL STORAGE ----------- */
+
+function saveData(){
+localStorage.setItem("workoutData",JSON.stringify(weekDays));
+}
+
+function loadData(){
+const d=localStorage.getItem("workoutData");
+if(!d) return;
+const parsed=JSON.parse(d);
+parsed.forEach((p,i)=>weekDays[i].muscles=p.muscles||[]);
+}
+
+/* ----------- EXERCISES ----------- */
+
+const exercisesData={
+"🏋️‍♂️ Compound":{
+"อก":[
+{name:"Dumbbell Bench Press",targets:"อก, ไหล่หน้า, หลังแขน",image:"https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Press.gif",videoId:"_gpUz7p0fSS1yJq-",description:"ท่าหลักสร้างอก"},
+{name:"Incline Dumbbell Press",targets:"อกบน",image:"",videoId:"8iPEnn-ltC8",description:"อกบน"},
+{name:"Decline Dumbbell Press",targets:"อกล่าง",image:"",videoId:"LfyQBUKR8SE",description:"อกล่าง"}
+],
+"หลัง":[
+{name:"One Arm Dumbbell Row",targets:"ปีกหลัง",image:"",videoId:"pYcpY20QaE8",description:"เพิ่มความหนาหลัง"},
+{name:"Bent Over Dumbbell Row",targets:"หลังกลาง",image:"",videoId:"roCP6wCXPqo",description:"หลังกลาง"}
+],
+"ขา":[
+{name:"Goblet Squat",targets:"ต้นขา ก้น",image:"",videoId:"MeIiIdhvXT4",description:"พื้นฐานขา"},
+{name:"Romanian Deadlift (RDL)",targets:"ก้น Hamstring",image:"",videoId:"2SHsk9AzdjA",description:"ก้นแรง"}
+]
+},
+"💪 Isolation":{
+"ไหล่":[
+{name:"Lateral Raise",targets:"ไหล่ข้าง",image:"",videoId:"3VcKaXpzqRo",description:"ไหล่กว้าง"},
+{name:"Rear Delt Fly",targets:"หลังไหล่",image:"",videoId:"EA7u4Q_8HQ0",description:"หลังไหล่"}
+],
+"แขน":[
+{name:"Dumbbell Curl",targets:"หน้าแขน",image:"",videoId:"ykJmrZ5v0Oo",description:"ลูกหนู"},
+{name:"Hammer Curl",targets:"แขนหนา",image:"",videoId:"zC3nLlEvin4",description:"ความหนาแขน"}
+],
+"ท้อง":[
+{name:"Russian Twist",targets:"เอวข้าง",image:"",videoId:"wkD8rjkodUI",description:"เอว"}
+]
+}
+};
+
+/* ----------- UI ----------- */
+
+let selectedDay=null;
+
+function renderDays(){
+const box=document.getElementById("dayList");
+box.innerHTML="";
+weekDays.forEach((d,i)=>{
+const el=document.createElement("div");
+el.className="day";
+el.innerText=d.day;
+el.onclick=()=>selectDay(i,el);
+box.appendChild(el);
+});
+}
+
+function selectDay(i,el){
+document.querySelectorAll(".day").forEach(x=>x.classList.remove("active"));
+el.classList.add("active");
+selectedDay=i;
+renderExercises();
+}
+
+function renderExercises(){
+if(selectedDay===null)return;
+const box=document.getElementById("exerciseList");
+box.innerHTML="";
+
+Object.keys(exercisesData).forEach(group=>{
+const g=document.createElement("div");
+g.className="groupTitle";
+g.innerText=group;
+box.appendChild(g);
+
+Object.keys(exercisesData[group]).forEach(muscle=>{
+const m=document.createElement("div");
+m.className="muscleTitle";
+m.innerText=muscle;
+box.appendChild(m);
+
+exercisesData[group][muscle].forEach(ex=>{
+const row=document.createElement("div");
+row.className="exerciseRow";
+
+const btn=document.createElement("button");
+btn.className="exerciseBtn";
+btn.innerHTML="<b>"+ex.name+"</b><br><small>"+ex.targets+"</small>";
+if(weekDays[selectedDay].muscles.includes(ex.name))btn.classList.add("selected");
+btn.onclick=()=>toggleExercise(ex);
+
+const view=document.createElement("button");
+view.className="viewBtn";
+view.innerText="▶";
+view.onclick=(e)=>{e.stopPropagation();showDetail(ex)};
+
+row.appendChild(btn);
+row.appendChild(view);
+box.appendChild(row);
+});
+});
+});
+}
+
+function toggleExercise(ex){
+const list=weekDays[selectedDay].muscles;
+const i=list.indexOf(ex.name);
+i>-1?list.splice(i,1):list.push(ex.name);
+renderExercises();
+renderSchedule();
+saveData();
+}
+
+/* ----------- SCHEDULE ----------- */
+
+function renderSchedule(){
+const box=document.getElementById("schedule");
+box.innerHTML="";
+
+weekDays.forEach((d,i)=>{
+if(!d.muscles.length)return;
+
+const card=document.createElement("div");
+card.className="card";
+
+const head=document.createElement("div");
+head.className="cardHeader";
+
+const title=document.createElement("b");
+title.innerText=d.day;
+
+const actions=document.createElement("div");
+
+const edit=document.createElement("button");
+edit.className="btn edit";
+edit.innerText="✏️";
+edit.onclick=()=>editDay(i);
+
+const del=document.createElement("button");
+del.className="btn del";
+del.innerText="🗑️";
+del.onclick=()=>deleteDay(i);
+
+actions.appendChild(edit);
+actions.appendChild(del);
+head.appendChild(title);
+head.appendChild(actions);
+card.appendChild(head);
+
+d.muscles.forEach(name=>{
+const badge=document.createElement("span");
+badge.className="badge";
+badge.innerText=name;
+badge.onclick=()=>showDetail(findExercise(name));
+card.appendChild(badge);
+});
+
+box.appendChild(card);
+});
+}
+
+function findExercise(name){
+for(const g in exercisesData)
+for(const m in exercisesData[g])
+for(const ex of exercisesData[g][m])
+if(ex.name===name)return ex;
+return null;
+}
+
+function editDay(i){
+selectedDay=i;
+document.querySelectorAll(".day")[i].classList.add("active");
+renderExercises();
+window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteDay(i){
+if(!confirm("ลบวัน "+weekDays[i].day+" ?"))return;
+weekDays[i].muscles=[];
+renderSchedule();
+saveData();
+}
+
+/* ----------- MODAL ----------- */
+
+function showDetail(ex){
+if(!ex)return;
+document.getElementById("mTitle").innerText=ex.name;
+document.getElementById("mImg").src=ex.image||"https://via.placeholder.com/500x300?text="+encodeURIComponent(ex.name);
+document.getElementById("mDesc").innerText=ex.description;
+document.getElementById("mTarget").innerText="กล้ามเนื้อ: "+ex.targets;
+
+document.getElementById("videoBox").style.display="none";
+document.getElementById("playBtn").style.display="inline-block";
+
+document.getElementById("playBtn").onclick=()=>{
+document.getElementById("frame").src="https://www.youtube.com/embed/"+ex.videoId+"?autoplay=1";
+document.getElementById("videoBox").style.display="block";
+document.getElementById("playBtn").style.display="none";
+};
+
+document.getElementById("modal").classList.add("active");
+}
+
+function closeDetail(){
+document.getElementById("modal").classList.remove("active");
+document.getElementById("frame").src="";
+}
+
+/* ----------- START ----------- */
+
+loadData();
+renderDays();
+renderSchedule();
+
+</script>
+
+</body>
+</html>
